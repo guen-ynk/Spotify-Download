@@ -17,7 +17,11 @@ python ~3.8
 ## USAGE:
 
 ##install modules
-load your credentials to access spotify api ( mine are still there but u can replace them )
-#### replacement
+load your credentials to access spotify api
+
+unzip ffmpeg
+
+see README.txt
+#### api key replacement
 	echo "export CLIENT_ID=YOUR_ID" >> a.env
 	echo "export CLIENT_SECRET=YOUR_SECRET" >> a.env
