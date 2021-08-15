@@ -4,12 +4,13 @@
 @License: MIT
 """
 
-
 import errno
 import os
 import re
 import urllib.request
+from urllib.request import urlretrieve
 
+import eyed3
 import spotipy
 import spotipy.oauth2 as oauth2
 import youtube_dl
@@ -63,7 +64,7 @@ class SpYt:
         self.ydl_opts = {
             # 'quiet': True,
             'format': 'bestaudio/best',
-            'outtmpl': './music/%(title)s.%(ext)s',
+            'outtmpl': './music/%(id)s.%(ext)s',
             'ffmpeg_location': './ffmpeg/bin/',
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
@@ -76,19 +77,24 @@ class SpYt:
         )
         self.playlist_txt = read_txt('Playlist.txt')
 
-    def spotify_fetch(self, list_id) -> list:
+    def spotify_fetch(self, list_id) -> (list, list):
         counter = 0
+        term = ""
         song_container = []
         link_container = []
+        table = str.maketrans(dict.fromkeys("><:\?/|*"))
 
         sp = spotipy.Spotify(auth_manager=self.auth_manager)
         playlists = sp.playlist_items(playlist_id=list_id)
+
         self.ydl_opts['outtmpl'] = './music/' + str(list_id) + '/%(title)s.%(ext)s'
 
         while playlists:
             for i, playlist in enumerate(playlists['items']):
-                # print("%s # %s" % (playlist['track']['name'], playlist['track']['artists'][0]['name']))
-                song_container.append(playlist['track']['name'] + ' ' + playlist['track']['artists'][0]['name'])
+                term = str(playlist['track']['name'] + ' ' + playlist['track']['artists'][0]['name'])
+                term = term.translate(table)
+                urlretrieve(playlist["track"]['album']['images'][0]['url'], "images/" + term + ".jpg")
+                song_container.append(term)
             if playlists['next']:
                 counter += 100
                 playlists = sp.playlist_items(playlist_id=list_id, offset=counter)
@@ -105,7 +111,7 @@ class SpYt:
             )
             video_ids = re.findall(r"watch\?v=(\S{11})", html.read().decode())
             link_container.append("https://www.youtube.com/watch?v=" + video_ids[0])
-        return link_container
+        return link_container, song_container
 
     def youtube_fetch(self, link) -> list:
         return [link]
@@ -124,17 +130,37 @@ class SpYt:
                 continue
 
             if not option:
-                link_container = self.spotify_fetch(item)
+                link_container, terms = self.spotify_fetch(item)
+                self.downloadSpotify(link_container, terms, item)
             else:
                 link_container = self.youtube_fetch(item)
 
-            self.download(link_container)
+                self.download(link_container)
+            # MERGE
+            if not option:
+                for term in terms:
+                    audiofile = eyed3.load('music/' + item + "/" + term + ".mp3")
+                    if audiofile.tag is None:
+                        audiofile.initTag()
+
+                    audiofile.tag.images.set(3, open('images/' + term +'.jpg', 'rb').read(), 'image/jpeg')
+                    audiofile.tag.save(version=eyed3.id3.ID3_V2_3)
+
+                  #  audiofile.tag.save()
 
     def download(self, container: list):
         with youtube_dl.YoutubeDL(self.ydl_opts) as ydl:
             ydl.download(container)
 
+    def downloadSpotify(self, container: list, terms: list, item):
+        for n, term in enumerate(terms):
+            self.ydl_opts['outtmpl'] = './music/'+item+"/"+term+'.%(ext)s'
+            with youtube_dl.YoutubeDL(self.ydl_opts) as ydl:
+                ydl.download([container[n]])
+        self.ydl_opts['outtmpl'] = './music/%(id)s.%(ext)s'
+
 
 if __name__ == '__main__':
+    make_dir("images")
     SPFY = SpYt()
     SPFY.get_mp3()
