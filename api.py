@@ -124,7 +124,7 @@ class SpYt:
                 item = item.lstrip('https://open.spotify.com/playlist/').split('?')[0].strip()
             elif 'spotify:playlist:' in item:
                 item = item.lstrip('spotify:playlist:')
-            elif 'https://youtu' in item:
+            elif 'https://youtu' in item or "https://www.youtu":
                 option = 1
             else:
                 continue
